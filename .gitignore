@@ -1,0 +1,21 @@
+# IDE files
+
+.idea/
+.vscode/
+
+
+# VENVs
+
+venv/
+
+
+# Temporary files
+
+*.pyc
+__pycache__/
+*.py~
+
+
+# Secrets
+
+.env
