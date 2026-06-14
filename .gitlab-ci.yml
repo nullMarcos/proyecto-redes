@@ -5,4 +5,4 @@ sincronizar_a_github:
   script:
     - git remote add github https://x-access-token:${GITHUB_TOKEN}@github.com/nullMarcos/proyecto-redes.git || true
     - git fetch github main
-    - if [ "$(git rev-parse HEAD)" = "$(git rev-parse github/main)" ]; then echo "Repositorios idénticos. Todo al día."; else git push github main; fi
+    - if [ "$(git rev-parse HEAD)" = "$(git rev-parse github/main)" ]; then echo "Repositorios idénticos. Todo al día."; else git push github HEAD:main; fi
