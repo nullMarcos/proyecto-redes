@@ -5,21 +5,22 @@ sincronizar_a_github:
   stage: sync
   image: alpine:latest
   only:
-    - main # Cambia a 'master' si es necesario
+    - main # Cambialo a 'master' si tu rama se llama así
   before_script:
     - apk add --no-cache git openssh-client
   script:
-    # Configurar el repositorio remoto de GitHub con el Token
-    git remote add github https://x-access-token:${GITHUB_TOKEN}@github.com/nullMarcos/proyecto-redes.git
-    git fetch github main
+    - |
+      # Configurar el repositorio remoto de GitHub con el Token
+      git remote add github https://x-access-token:${GITHUB_TOKEN}@github.com/nullMarcos/proyecto-redes.git || true
+      git fetch github main
 
-    # Obtener los hashes de los últimos commits
-    GITLAB_COMMIT=$(git rev-parse HEAD)
-    GITHUB_COMMIT=$(git rev-parse github/main)
+      # Obtener los hashes de los últimos commits
+      GITLAB_COMMIT=$(git rev-parse HEAD)
+      GITHUB_COMMIT=$(git rev-parse github/main)
 
-    if [ "$GITLAB_COMMIT" = "$GITHUB_COMMIT" ]; then
-      echo "Ambos repositorios ya están idénticos. Sincronización cancelada para evitar bucles."
-    else
-      echo "Detectados cambios nuevos en GitLab. Sincronizando GitHub..."
-      git push github main
-    fi
+      if [ "$GITLAB_COMMIT" = "$GITHUB_COMMIT" ]; then
+        echo "Ambos repositorios ya están idénticos. Sincronización cancelada para evitar bucles."
+      else
+        echo "Detectados cambios nuevos en GitLab. Sincronizando GitHub..."
+        git push github main
+      fi
