@@ -2,100 +2,85 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import uvicorn
 import json
 
-app = FastAPI(title="Servidor de Monitoreo - Nodos Independientes")
+app = FastAPI(title="Servidor de Monitoreo - Torres Completas")
 
 class ConnectionManager:
-    """Clase para manejar y agrupar las conexiones activas de servidor.
-        Organiza los sensores individualmente en base al ID de su respectiva torre.
+    """
+    Clase para manejar y agrupar las conexiones activas del servidor.
+    Mantiene un registro directo de cada torre conectada.
     """
     def __init__(self):
-        # Estructura: {"torre_1": {"sensor_temp": ws1, "sensor_ph": ws2}, "torre_2": {...}}
-        self.active_connections: dict[str, dict[str, WebSocket]] = {}
+        # Estructura simple: {"torre_1": ws_torre1, "torre_2": ws_torre2}
+        self.active_connections: dict[str, WebSocket] = {}
 
-    async def connect(self, websocket: WebSocket, torre_id: str, tipo_sensor: str):
-        """Función para aceptar y registrar las conecciones entrantes de los sensores.
+    async def connect(self, websocket: WebSocket, torre_id: str):
+        """
+        Acepta y registra la conexión entrante de una torre.
 
-        :param websocket: El objeto de conexión (canal) abierto con el sensor.
+        :param websocket: El objeto de conexión (canal) abierto con la torre.
         :type websocket: WebSocket
-        :param torre_id: Identificador de a qué torre pertenece el sensor
+        :param torre_id: Identificador de la torre que se conecta.
         :type torre_id: str
-        :param tipo_sensor: Variable que especifica qué tipo de sensor es (sensor_temp, sensor_ph, etc.)
-        :type tipo_sensor: str
         """        
         await websocket.accept()
         
-        # Si es la primera vez que escuchamos de esta torre, le creamos su espacio
-        if torre_id not in self.active_connections:
-            self.active_connections[torre_id] = {}
-            
-        # Registramos el sensor específico dentro de su torre
-        self.active_connections[torre_id][tipo_sensor] = websocket
-        print(f"[CONEXIÓN] {tipo_sensor} de la {torre_id} conectado.")
+        # Registramos la torre 
+        self.active_connections[torre_id] = websocket
+        print(f"[CONEXIÓN] Torre {torre_id} conectada al servidor.")
 
-    def disconnect(self, torre_id: str, tipo_sensor: str):
-        """Elimina el registro de un sensor cuando se desconecta del servidor.
+    def disconnect(self, torre_id: str):
+        """
+        Elimina el registro de una torre cuando se desconecta.
 
-        :param torre_id: Identificador de la torre a la cual pertenece el sensor a desconectar
+        :param torre_id: Identificador de la torre a desconectar.
         :type torre_id: str
-        :param tipo_sensor: Variable que especifica qué tipo de sensor es (sensor_temp, sensor_ph, etc.)
-        :type tipo_sensor: str
         """        
-        # Eliminamos solo el sensor que se cayó, no toda la torre
-        if torre_id in self.active_connections and tipo_sensor in self.active_connections[torre_id]:
-            del self.active_connections[torre_id][tipo_sensor]
-            print(f"[DESCONEXIÓN] {tipo_sensor} de la {torre_id} desconectado.")
+        if torre_id in self.active_connections:
+            del self.active_connections[torre_id]
+            print(f"[DESCONEXIÓN] Torre {torre_id} desconectada.")
 
-manager = ConnectionManager() #Se instancia la clase para manejar conexiones
+manager = ConnectionManager() # Se instancia la clase para manejar conexiones
 
-# Variables para armar telemetría de torre antes de guardarse en la base de datos
-estado_torres = {}
+@app.websocket("/ws/torre/{torre_id}")
+async def manejar_torre(websocket: WebSocket, torre_id: str):
+    """
+    Maneja la conexión en tiempo real con un nodo (Torre completa).
 
-@app.websocket("/ws/torre/{torre_id}/sensor/{tipo_sensor}")
-async def manejar_sensor(websocket: WebSocket, torre_id: str, tipo_sensor: str):
-    """Maneja la conexión de un sensor individual perteneciente a una torre.
-
-    :param websocket: El objeto de conexión (canal) abierto con el sensor.
+    :param websocket: El objeto de conexión (canal) abierto con la torre.
     :type websocket: WebSocket
-    :param torre_id: Identificador de a qué torre pertenece el sensor
+    :param torre_id: Identificador único de la torre.
     :type torre_id: str
-    :param tipo_sensor: Variable que especifica qué tipo de sensor es (sensor_temp, sensor_ph, etc.)
-    :type tipo_sensor: str
     """    
-    await manager.connect(websocket, torre_id, tipo_sensor) #Se llama al connection manager
-    
-    # Inicializamos el estado en memoria de la torre si no existe
-    if torre_id not in estado_torres:
-        estado_torres[torre_id] = {
-            "temperatura": None, "ph": None, "presion": None, 
-            "nivel": None, "caudal_entrada": None, "caudal_salida": None
-        }
+    await manager.connect(websocket, torre_id)
     
     try:
         while True:
+            # Recibimos el paquete completo de la torre
             data = await websocket.receive_text()
             paquete = json.loads(data)
             
-            # Validar Token e Integridad (Hash) 
-            
-            # Actualizar solo el valor que corresponde a este sensor en la memoria
-            valor = paquete.get("valor")
-            estado_torres[torre_id][tipo_sensor] = valor
-            
-            print(f"[ACTUALIZACIÓN] {torre_id} - {tipo_sensor}: {valor}")
-            print(f"Estado actual de {torre_id}: {estado_torres[torre_id]}")
-            
-            #Lógica para guardar en Base de Datos:
+            print(f"[TELEMETRÍA RECIBIDA - {torre_id}] {paquete}")
+        
+            # Extraer el hash del paquete y validar integridad.
+
+            # Validar token_autenticacion contra la BD.
+
+            # Guardar todo el paquete directamente en la tabla reporte_telemetria.
+
+            # Evaluar si los valores superan umbrales (ej. presión muy alta) 
 
     except WebSocketDisconnect:
-        manager.disconnect(torre_id, tipo_sensor)
+        manager.disconnect(torre_id)
     except json.JSONDecodeError:
-        print(f"[ERROR] Paquete inválido de {tipo_sensor} en {torre_id}")
+        print(f"[ERROR] Paquete inválido recibido de la Torre {torre_id}")
+    except Exception as e:
+        print(f"[ERROR CRÍTICO] {torre_id}: {e}")
+        manager.disconnect(torre_id)
 
 def start():
-    """Función para iniciar el servidor HTTP y WebSocket
-    """    
+    """Función para iniciar el servidor HTTP y WebSocket."""    
     print("Iniciando servidor FastAPI...")
-    uvicorn.run(app, host="0.0.0.0", port=5050) #Escucha activa
+    uvicorn.run(app, host="0.0.0.0", port=5050) # Escucha activa
 
 if __name__ == "__main__":
     start()
