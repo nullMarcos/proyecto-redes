@@ -1,0 +1,14 @@
+services:
+  servidor-central:
+    # Le dice a compose que busque el Dockerfile dentro de la carpeta /server
+    build:
+      context: .
+      dockerfile: server/dockerfile
+    container_name: fastapi_server_redes
+    # Mapea el puerto 5050 de tu computadora al 5050 del contenedor
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./server:/app/server
+    # Reinicia el contenedor automáticamente si falla
+    restart: always
