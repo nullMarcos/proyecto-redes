@@ -1,0 +1,22 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Actualizar el sistema e instalar Python 3, pip y dependencias necesarias
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Establecer el directorio de trabajo dentro del contenedor
+WORKDIR /app
+
+# Copiar los archivos de la carpeta del nodo al contenedor
+COPY . /app/node
+
+# Instalar las librerías de Python requeridas para el nodo
+RUN pip3 install --break-system-packages websockets
+
+# Comando por defecto para iniciar 1 torre
+CMD ["python3", "node/nodo.py", "--n_torres", "1"]

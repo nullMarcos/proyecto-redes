@@ -1,18 +1,15 @@
-import time
+import asyncio
 import random
 import argparse
-import threading
-import requests
-import urllib3
-
-
-#Como las firmas digitales se pagan XD para hacer pruebas se deben desactivar las warnings dadas por el protocolo https al hacer una request con verify=False
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import os
+import json
+import ssl
+import websockets
 
 """
 @class TorreBlanqueamiento
 @brief Simula el comportamiento de un nodo (torre de blanqueamiento de celulosa) en un entorno industrial.
-       Genera datos de sensores, simula anomalías y se comunica con un servidor central.
+       Genera datos de sensores, simula anomalías y se comunica con un servidor central vía WebSockets seguros (wss).
 """
 class TorreBlanqueamiento:
 
@@ -24,7 +21,10 @@ class TorreBlanqueamiento:
     """
     def __init__(self, torre_id):
         self.torre_id = torre_id
-        self.url_servidor = "https://localhost:8000/api/datos" #URL cualquier, cambiar por la URL real
+        # Construimos la URL agregando el ID de la torre al final
+        base_url = os.environ.get("SERVER_URL", "wss://localhost:5050/ws/torre/")
+        self.url_servidor = f"{base_url}{self.torre_id}"
+        self.ws = None
         
         self.estado_sensores = {
             "temperatura": {"valor_base": 80.0, "estado": "NORMAL"},
@@ -39,15 +39,36 @@ class TorreBlanqueamiento:
     @param datos_torre Diccionario que contiene el paquete de datos generados por los sensores.
     @return Un diccionario con la respuesta del servidor o del mock generalmente con una "instruccion".
     """
-    def enviar_datos_servidor(self, datos_torre):
+    async def enviar_datos_servidor(self, datos_torre):
 
-        #Intento de conectarse con el servidor si falla se genera una respuesta mock basada en los datos de la torre
+        #Intento de conectarse con el servidor vía WebSockets seguros (WSS)
         try:
-            respuesta = requests.post(self.url_servidor, json=datos_torre, verify=False)
-            return respuesta.json()
-        except requests.exceptions.RequestException as e:
+            # Reutilizamos la conexión si ya está activa, si no, conectamos
+            if self.ws is None:
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                self.ws = await websockets.connect(self.url_servidor, ssl=ssl_context)
+            
+            # Enviamos el paquete
+            await self.ws.send(json.dumps(datos_torre))
+            
+            # Esperamos respuesta del servidor con un tiempo límite (timeout)
+            try:
+                respuesta_str = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
+                return json.loads(respuesta_str)
+            except asyncio.TimeoutError:
+                # Si el servidor no envía nada, seguimos sin instrucción
+                return {"instruccion": "N/A"}
+
+        except Exception as e:
             # print(f"Error al enviar datos al servidor: {e}")
-            print("El servidor no está activo, continuando ejecucion con un MOCK")
+            print(f"[Torre {self.torre_id}] El servidor no está activo o se perdió la conexión, continuando ejecucion con un MOCK")
+            
+            # Cerramos la conexión corrupta para que el próximo ciclo intente reconectar
+            if self.ws:
+                await self.ws.close()
+                self.ws = None
             
             #MOCK
             respuesta_mock = {"instruccion": "N/A"}
@@ -106,7 +127,7 @@ class TorreBlanqueamiento:
     Método principal (Bucle Infinito) que arranca la simulación de la torre.
     Genera el comportamiento, empaqueta los datos, los transmite y ejecuta las instrucciones dadas por un servidor central.
     """
-    def iniciar_simulacion(self):
+    async def iniciar_simulacion(self):
 
         print("Simulacion de torre de blanqueamiento: ")
 
@@ -144,41 +165,44 @@ class TorreBlanqueamiento:
             print()
 
             #Envio de datos y recepcion de instrucciones
-            respuesta_servidor = self.enviar_datos_servidor(datos_torre)
+            respuesta_servidor = await self.enviar_datos_servidor(datos_torre)
             instruccion = respuesta_servidor.get("instruccion", "N/A")
 
             self.aplicar_instrucciones(instruccion)
 
-            time.sleep(random.uniform(3.0, 5.0))
+            await asyncio.sleep(random.uniform(3.0, 5.0))
 
 #BLOQUE DE EJECUCION PRINCIPAL
-if __name__ == "__main__":
+async def main():
     parser = argparse.ArgumentParser(description="Simulador de datos de torre de blanqueamiento.")
     parser.add_argument("--n_torres", required=True, help="Numero de torres a simular (ej: 5)")
     args = parser.parse_args()
     
-    #Guardamos los hilos activos para esta ejecucion
+    #Guardamos las tareas asíncronas para esta ejecucion
     n_torres = int(args.n_torres)
-    hilos = []
+    tareas = []
 
     for i in range(1, n_torres + 1):
         
         #Instancia de una torre de blanqueamiento
         torre = TorreBlanqueamiento(torre_id=i)
 
-        #Creamos un hilo para cada torre
-        hilo = threading.Thread(target=torre.iniciar_simulacion)
-        hilo.daemon = True
-        hilo.start()
-        hilos.append(hilo)
+        #Creamos una tarea asíncrona para cada torre
+        tarea = asyncio.create_task(torre.iniciar_simulacion())
+        tareas.append(tarea)
 
-        #Pausa para evitar que todas las torres inicien exactamente al mismo tiempo
-        time.sleep(1)
+        #Pausa asíncrona para evitar que todas las torres inicien exactamente al mismo tiempo
+        await asyncio.sleep(1)
 
     print("Todas las torres iniciadas. Presiona Ctrl+C para detener la simulacion.")
 
     try:
-        while True:
-            time.sleep(1)
+        await asyncio.gather(*tareas)
+    except asyncio.CancelledError:
+        pass
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
     except KeyboardInterrupt:
-        print("Simulacion terminada")
+        print("\nSimulacion terminada")
