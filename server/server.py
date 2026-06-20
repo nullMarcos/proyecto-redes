@@ -79,8 +79,15 @@ async def manejar_torre(websocket: WebSocket, torre_id: str):
 
 def start():
     """Función para iniciar el servidor HTTP y WebSocket."""    
-    print("Iniciando servidor FastAPI...")
-    uvicorn.run(app, host="0.0.0.0", port=5050) # Escucha activa
+    print("Iniciando servidor FastAPI con HTTPS...")
+    #Se inicia el servidor con certificados para HTTPS
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=5050, 
+        ssl_keyfile="server/certs/key.pem", 
+        ssl_certfile="server/certs/cert.pem"
+    )
 
 if __name__ == "__main__":
     start()
