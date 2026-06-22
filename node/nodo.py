@@ -105,23 +105,62 @@ class TorreBlanqueamiento:
     
     @param instruccion Cadena de texto con la orden proveniente del servidor.
     """
-    def aplicar_instrucciones(self, instruccion):
+    def aplicar_instrucciones(self, instruccion, valor_parametro = None):
 
         #Actuadores basados en la instruccion del servidor
-        if instruccion != "N/A":
-            print(f"Instruccion del servidor para torre {self.torre_id}: {instruccion}")
+        if instruccion == "N/A":
+            return
+        
+        print(f"Instruccion del servidor para torre {self.torre_id}: {instruccion} (Valor: {valor_parametro})")
 
-        #Se reducen la temperatura o los flujos de pulpa y clo2 a sus valores base normales
-
-        if instruccion == "REDUCIR_TEMPERATURA":
+                # Convertir a flotante por seguridad si viene con formato incorrecto
+        if valor_parametro is not None:
+            try:
+                valor_parametro = float(valor_parametro)
+            except ValueError:
+                valor_parametro = None
+        # 1. Aumentar / Disminuir flujo de pulpa
+        if instruccion == "AUMENTAR_FLUJO_PULPA":
+            inc = valor_parametro if valor_parametro is not None else 2.0
+            self.estado_sensores["flujo_pulpa"]["valor_base"] += inc
+            self.estado_sensores["flujo_pulpa"]["estado"] = "NORMAL"
+        elif instruccion == "DISMINUIR_FLUJO_PULPA":
+            dec = valor_parametro if valor_parametro is not None else 2.0
+            self.estado_sensores["flujo_pulpa"]["valor_base"] = max(0.0, self.estado_sensores["flujo_pulpa"]["valor_base"] - dec)
+            self.estado_sensores["flujo_pulpa"]["estado"] = "NORMAL"
+        # 2. Aumentar / Disminuir flujo de ClO2
+        elif instruccion == "AUMENTAR_FLUJO_CLO2":
+            inc = valor_parametro if valor_parametro is not None else 1.0
+            self.estado_sensores["flujo_clo2"]["valor_base"] += inc
+            self.estado_sensores["flujo_clo2"]["estado"] = "NORMAL"
+        elif instruccion == "DISMINUIR_FLUJO_CLO2":
+            dec = valor_parametro if valor_parametro is not None else 1.0
+            self.estado_sensores["flujo_clo2"]["valor_base"] = max(0.0, self.estado_sensores["flujo_clo2"]["valor_base"] - dec)
+            self.estado_sensores["flujo_clo2"]["estado"] = "NORMAL"
+        # 3. Aumentar / Disminuir temperatura
+        elif instruccion == "AUMENTAR_TEMPERATURA":
+            inc = valor_parametro if valor_parametro is not None else 5.0
+            self.estado_sensores["temperatura"]["valor_base"] += inc
+            self.estado_sensores["temperatura"]["estado"] = "NORMAL"
+        elif instruccion == "DISMINUIR_TEMPERATURA":
+            dec = valor_parametro if valor_parametro is not None else 5.0
+            self.estado_sensores["temperatura"]["valor_base"] = max(0.0, self.estado_sensores["temperatura"]["valor_base"] - dec)
+            self.estado_sensores["temperatura"]["estado"] = "NORMAL"
+        # 4. Activar válvula de alivio
+        elif instruccion == "ACTIVAR_VALVULA_ALIVIO":
+            print(f"[ACTUADOR] Válvula de alivio activada en la torre {self.torre_id}. Liberando presión...")
+            # Puesto que presión se genera de forma aleatoria en cada ciclo sin usar un valor_base persistente,
+            # aquí puedes decidir simular una reducción temporal o simplemente registrar la acción.
+        # Soporte para retrocompatibilidad con las instrucciones previas del MOCK del servidor
+        elif instruccion == "DISMINUIR_TEMPERATURA":
             self.estado_sensores["temperatura"]["valor_base"] = 80.0
             self.estado_sensores["temperatura"]["estado"] = "NORMAL"
-
-        elif instruccion == "REDUCIR_CAUDAL":
+        elif instruccion == "DISMINUIR_CAUDAL":
             self.estado_sensores["flujo_pulpa"]["valor_base"] = 15.0
             self.estado_sensores["flujo_clo2"]["valor_base"] = 5.0
             self.estado_sensores["flujo_pulpa"]["estado"] = "NORMAL"
-            self.estado_sensores["flujo_clo2"]["estado"] = "NORMAL" 
+            self.estado_sensores["flujo_clo2"]["estado"] = "NORMAL"
+
 
     """
     Método principal (Bucle Infinito) que arranca la simulación de la torre.
@@ -167,8 +206,9 @@ class TorreBlanqueamiento:
             #Envio de datos y recepcion de instrucciones
             respuesta_servidor = await self.enviar_datos_servidor(datos_torre)
             instruccion = respuesta_servidor.get("instruccion", "N/A")
+            valor_parametro = respuesta_servidor.get("valor_parametro", None)
 
-            self.aplicar_instrucciones(instruccion)
+            self.aplicar_instrucciones(instruccion, valor_parametro)
 
             await asyncio.sleep(random.uniform(3.0, 5.0))
 

@@ -1,7 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+from enum import Enum
+
+class TipoInstruccion(str, Enum):
+    AUMENTAR_FLUJO_PULPA = "AUMENTAR_FLUJO_PULPA"
+    DISMINUIR_FLUJO_PULPA = "DISMINUIR_FLUJO_PULPA"
+    AUMENTAR_FLUJO_CLO2 = "AUMENTAR_FLUJO_CLO2"
+    DISMINUIR_FLUJO_CLO2 = "DISMINUIR_FLUJO_CLO2"
+    AUMENTAR_TEMPERATURA = "AUMENTAR_TEMPERATURA"       
+    DISMINUIR_TEMPERATURA = "DISMINUIR_TEMPERATURA"
+    ACTIVAR_VALVULA_ALIVIO = "ACTIVAR_VALVULA_ALIVIO"
 
 # 1. MODELOS DE DATOS (Dominio)
 class Operador(BaseModel):
@@ -16,7 +26,8 @@ class Comando(BaseModel):
     id_torre: int
     id_operador: int
     fecha_hora: datetime
-    tipo_instruccion: str             # Ej: "REDUCIR_TEMPERATURA", "REDUCIR_CAUDAL"
+    tipo_instruccion: TipoInstruccion
+    valor_parametro: Optional[float] = None
     estado_ejecucion: str             # Ej: "pendiente", "ejecucion exitosa", "fallo"
     hash_comando: str                 # Hash de integridad/auditoría
 
@@ -24,8 +35,23 @@ class Comando(BaseModel):
 class SolicitudComando(BaseModel):
     id_operador: int
     id_torre: int
-    tipo_instruccion: str             # Ej: "REDUCIR_TEMPERATURA", "REDUCIR_CAUDAL"
+    tipo_instruccion: TipoInstruccion
+    valor_parametro: Optional[float] = None
 
+    @model_validator(mode='after')
+    def verificador_parametro_segun_instruccion(self):
+        # Si la instrucción requiere un valor numérico y viene vacío, lanzamos error
+        instrucciones_con_valor = {
+            TipoInstruccion.AUMENTAR_TEMPERATURA, 
+            TipoInstruccion.DISMINUIR_TEMPERATURA,
+            TipoInstruccion.AUMENTAR_FLUJO_PULPA,
+            TipoInstruccion.DISMINUIR_FLUJO_PULPA
+        }
+        
+        if self.tipo_instruccion in instrucciones_con_valor and self.valor_parametro is None:
+            raise ValueError(f"La instrucción {self.tipo_instruccion} requiere especificar un 'valor_parametro'.")
+        
+        return self
 
 # 2. INTERFAZ DEL REPOSITORIO (El Contrato)
 class OperadorRepository(ABC):

@@ -37,12 +37,12 @@ class ConnectionManager:
         self.active_connections[torre_id] = websocket
         print(f"[CONEXIÓN] Torre {torre_id} conectada al servidor.")
 
-    def disconnect(self, torre_id: str):
+    def disconnect(self, torre_id: int):
         """
         Elimina el registro de una torre cuando se desconecta.
 
         :param torre_id: Identificador de la torre a desconectar.
-        :type torre_id: str
+        :type torre_id: int
         """        
         if torre_id in self.active_connections:
             del self.active_connections[torre_id]
@@ -83,6 +83,7 @@ async def send_operator_command(solicitud: SolicitudComando):
         id_operador=solicitud.id_operador,
         fecha_hora=fecha_actual,
         tipo_instruccion=solicitud.tipo_instruccion,
+        valor_parametro=solicitud.valor_parametro,
         estado_ejecucion="pendiente",
         hash_comando=hash_val
     )
@@ -133,13 +134,22 @@ async def manejar_torre(websocket: WebSocket, torre_id: str):
                 
             if comando_pendiente:
                 instruccion = comando_pendiente.tipo_instruccion
+                valor_parametro = comando_pendiente.valor_parametro
                 comando_pendiente.estado_ejecucion = "ejecucion exitosa"
-                print(f"[COMANDO ENVIADO] Comando ID {comando_pendiente.id} enviado a torre {torre_id}: {instruccion}")
+                print(f"[COMANDO ENVIADO] Comando ID {comando_pendiente.id} enviado a torre {torre_id}: {instruccion} con valor {valor_parametro}")
+
+                respuesta_payload = {
+                    "instruccion": instruccion,
+                    "valor_parametro": valor_parametro
+                }
             else:
-                instruccion = "N/A"
+                respuesta_payload = {
+                    "instruccion": "N/A",
+                    "valor_parametro": None
+                }
             
             # Responder inmediatamente con la instrucción
-            await websocket.send_text(json.dumps({"instruccion": instruccion}))
+            await websocket.send_text(json.dumps(respuesta_payload))
 
     except WebSocketDisconnect:
         manager.disconnect(torre_id)
