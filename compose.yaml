@@ -1,28 +1,39 @@
-services:
-  servidor-central:
-    build:
-      context: .
-      dockerfile: server/dockerfile
-    container_name: fastapi_server_redes
-    ports:
-      - "5050:5050"
-    volumes:
-      - ./server:/app/server
-    # Reinicia el contenedor automáticamente si falla
-    restart: always
+name: "redes-de-computadores"
 
-  nodo:
+services:
+  torre:
     build:
-      context: .
-      dockerfile: node/dockerfile
-    container_name: nodo_redes
+      context: "./torre/"
+      dockerfile: "./dockerfile"
+    
+    image: "torre"
+    container_name: "torre"
+    
     environment:
-      # Configuración de la URL base para el WebSocket seguro
-      - SERVER_URL=wss://servidor-central:5050/ws/torre/
+      - TORRE_ID=1
+    
     depends_on:
-      - servidor-central
+      servidor:
+        condition: service_healthy
+        restart: true
+    
     volumes:
-      - ./node:/app/node
-    restart: always
-    #El último parámetro es la cantidad de torres a simular
-    command: ["python3", "node/nodo.py", "--n_torres", "3"]
+      - type: bind
+        source: "./torre/"
+        target: "/service/"
+  
+  servidor:
+    build:
+      context: "./servidor/"
+      dockerfile: "./dockerfile"
+    
+    image: "servidor"
+    container_name: "servidor"
+    
+    ports:
+      - 5050:5050
+    
+    volumes:
+      - type: bind
+        source: "./servidor/"
+        target: "/service/"

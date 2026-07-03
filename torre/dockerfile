@@ -1,0 +1,17 @@
+FROM python:3.14
+	
+	WORKDIR /service/
+	
+	ARG DEBIAN_FRONTEND=noninteractive
+	
+	ENV TORRE_ID=1
+	ENV SERVER_BASE_URL="wss://servidor:5050/ws"
+	
+	COPY ./requirements.txt ./
+	
+	RUN python3 -m pip install --upgrade pip && \
+		python3 -m pip install --requirement requirements.txt
+	
+	COPY ./ ./
+	
+	ENTRYPOINT ["python3", "cliente.py"]
