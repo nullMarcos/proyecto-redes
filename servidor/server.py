@@ -61,12 +61,16 @@ class ConnectionManager:
 		print(f"[DESCONEXIÓN] Torre {torre_id} desconectada.")
 	
 	def add_instruction(self, torre_id: int, comando: Comando):
-		"""Guarda una instrucción para ser enviada en la próxima telemetría."""
-		self.pending_instructions[torre_id] = comando
+		"""Encola una instrucción para que no se pierda si entran varias en paralelo."""
+		if torre_id not in self.pending_instructions:
+			self.pending_instructions[torre_id] = []
+		self.pending_instructions[torre_id].append(comando)
 	
 	def consume_instruction(self, torre_id: int) -> Optional[Comando]:
-		"""Devuelve la instrucción pendiente para la torre y la elimina de la cola."""
-		return self.pending_instructions.pop(torre_id, None)
+		"""Devuelve la siguiente instrucción pendiente de la cola FIFO y lo elimina de la lista."""
+		if torre_id in self.pending_instructions and self.pending_instructions[torre_id]:
+			return self.pending_instructions[torre_id].pop(0)
+		return None
 
 
 manager = ConnectionManager()  # Se instancia la clase para manejar conexiones
