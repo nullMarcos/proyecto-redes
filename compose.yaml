@@ -5,34 +5,34 @@ services:
     build:
       context: "./torre/"
       dockerfile: "./dockerfile"
-    
+
     image: "torre"
     container_name: "torre"
-    
+
     environment:
       - TORRE_ID=1
-    
+
     depends_on:
       servidor:
         condition: service_healthy
         restart: true
-    
+
     volumes:
       - type: bind
         source: "./torre/"
         target: "/service/"
-  
+
   servidor:
     build:
       context: "./servidor/"
       dockerfile: "./dockerfile"
-    
+
     image: "servidor"
     container_name: "servidor"
-    
+
     ports:
       - 5050:5050
-    
+
     volumes:
       - type: bind
         source: "./servidor/"
