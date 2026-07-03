@@ -180,6 +180,15 @@ async def manejar_torre(websocket: WebSocket, torre_id: str):
                 temperatura = lecturas.get("temperatura", {}).get("valor", 80.0)
                 caudal = lecturas.get("caudal", {}).get("valor", 0.0)
 
+                # Algoritmo de Detección de Fugas cruzando Caudal y Presión
+                if caudal >= 15.0:
+                    presion_teorica = caudal * 7.75
+                    if presion < (presion_teorica * 0.85):
+                        print(
+                            f"[ALERTA DE FUGA - TORRE {torre_id}] Caudal alto ({caudal} L/s) "
+                            f"pero presión anormalmente baja ({presion} kPa). Posible ruptura en la línea."
+                        )
+
                 # Alerta por desviación de neutralización química (pH fuera de rango crítico)
                 if ph < 2.5 or ph > 8.5:
                     print(
