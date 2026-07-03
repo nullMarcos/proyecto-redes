@@ -171,14 +171,12 @@ async def manejar_torre(websocket: WebSocket, torre_id: str):
 				)
 				
 				respuesta_payload = {
-					"operacion": {
-						'nombre': instruccion,
-						'diferencia': valor_parametro,
-					},
+					'nombre': instruccion,
+					'diferencia': valor_parametro,
 				}
 			
 			else:
-				respuesta_payload = {"instruccion": "N/A", "valor_parametro": None}
+				respuesta_payload = {"nombre": "N/A", "diferencia": 0}
 			
 			# Responder inmediatamente con la instrucción
 			await websocket.send_text(json.dumps(respuesta_payload))

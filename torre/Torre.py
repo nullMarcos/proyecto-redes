@@ -115,22 +115,22 @@ class Torre:
 		
 		match operacion.get('nombre', ''):
 			case 'AUMENTAR_FLUJO_PULPA':
-				self.sensores['flujo_pulpa'].modificar(operacion.get(diferencia, 0))
+				self.sensores['flujo_pulpa'].modificar(operacion.get('diferencia', 0))
 			
 			case 'DISMINUIR_FLUJO_PULPA':
-				self.sensores['flujo_pulpa'].modificar(operacion.get(diferencia, 0))
+				self.sensores['flujo_pulpa'].modificar(operacion.get('diferencia', 0))
 			
 			case 'AUMENTAR_FLUJO_CLO2':
-				self.sensores['flujo_clo2'].modificar(operacion.get(diferencia, 0))
+				self.sensores['flujo_clo2'].modificar(operacion.get('diferencia', 0))
 			
 			case 'DISMINUIR_FLUJO_CLO2':
-				self.sensores['flujo_clo2'].modificar(operacion.get(diferencia, 0))
+				self.sensores['flujo_clo2'].modificar(operacion.get('diferencia', 0))
 			
 			case 'AUMENTAR_TEMPERATURA':
-				self.sensores['temperatura'].modificar(operacion.get(diferencia, 0))
+				self.sensores['temperatura'].modificar(operacion.get('diferencia', 0))
 			
 			case 'DISMINUIR_TEMPERATURA':
-				self.sensores['temperatura'].modificar(operacion.get(diferencia, 0))
+				self.sensores['temperatura'].modificar(operacion.get('diferencia', 0))
 		
 		return
 	
