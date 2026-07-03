@@ -1,5 +1,6 @@
 FROM ubuntu:24.04
 	ENV DEBIAN_FRONTEND=noninteractive
+	ENV TOKEN_SECRETO="celulosa_secure_2026"
 	
 	HEALTHCHECK --interval=5s --timeout=5s --start-period=5s --retries=5 \
 		CMD curl --fail --insecure "https://0.0.0.0:5050/" || exit 1

@@ -4,6 +4,7 @@ import os
 import random
 import ssl
 import websockets
+import hashlib
 
 from Torre import Torre
 
@@ -62,6 +63,16 @@ class Servidor:
 		await self.conectar()
 		
 		try:
+			token = os.environ.get('TOKEN_SECRETO', '')
+			payload_para_firmar = dict(datos)
+			if 'hash_integridad' in payload_para_firmar:
+				del payload_para_firmar['hash_integridad']
+				
+			string_payload = json.dumps(payload_para_firmar, sort_keys=True)
+			firma = hashlib.sha256((string_payload + token).encode()).hexdigest()
+			
+			datos['hash_integridad'] = firma
+			
 			print(f'Enviando información:', flush = True)
 			print(json.dumps(datos, indent = 2), flush = True)
 			

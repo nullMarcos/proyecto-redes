@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import datetime
 import hashlib
 import json
+import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 import uvicorn
 
@@ -155,6 +156,17 @@ async def manejar_torre(websocket: WebSocket, torre_id: str):
             # Recibimos el paquete completo de la torre
             data = await websocket.receive_text()
             paquete = json.loads(data)
+
+            # === AUDITORÍA DE INTEGRIDAD ===
+            hash_recibido = paquete.pop('hash_integridad', None)
+            token = os.environ.get('TOKEN_SECRETO', '')
+            string_payload = json.dumps(paquete, sort_keys=True)
+            hash_calculado = hashlib.sha256((string_payload + token).encode()).hexdigest()
+            
+            if hash_recibido != hash_calculado:
+                print(f"[ALERTA DE SEGURIDAD] Paquete de Torre {torre_id} rechazado por fallo de integridad.")
+                continue # Ignora el paquete malicioso
+            # ===============================
 
             print(f"[TELEMETRÍA RECIBIDA - {torre_id}] {paquete}")
 
