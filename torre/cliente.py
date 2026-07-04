@@ -5,6 +5,7 @@ import random
 import ssl
 import websockets
 import hashlib
+import hmac
 
 from Torre import Torre
 
@@ -33,9 +34,11 @@ class Servidor:
 			try:
 				print("Conectando con el servidor central...", flush = True)
 				
-				contexto_SSL = ssl.create_default_context()
+				contexto_SSL = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+				# Confiar unicamente en el certificado autofirmado del servidor
+				contexto_SSL.load_verify_locations('cert.pem')
+				# Ignorar discrepancias de hostname en entorno local/docker
 				contexto_SSL.check_hostname = False
-				contexto_SSL.verify_mode = ssl.CERT_NONE
 				
 				self.conexion = await websockets.connect(self.URL, ssl = contexto_SSL)
 				
@@ -69,7 +72,7 @@ class Servidor:
 				del payload_para_firmar['hash_integridad']
 				
 			string_payload = json.dumps(payload_para_firmar, sort_keys=True)
-			firma = hashlib.sha256((string_payload + token).encode()).hexdigest()
+			firma = hmac.new(token.encode(), string_payload.encode(), hashlib.sha256).hexdigest()
 			
 			datos['hash_integridad'] = firma
 			
@@ -90,8 +93,18 @@ class Servidor:
 		
 		try:
 			respuesta = await asyncio.wait_for(self.conexion.recv(), timeout = 1.0)
+			paquete = json.loads(respuesta)
 			
-			return json.loads(respuesta)
+			token = os.environ.get('TOKEN_SECRETO', '')
+			hash_recibido = paquete.pop('hash_integridad', None)
+			string_payload = json.dumps(paquete, sort_keys=True)
+			hash_calculado = hmac.new(token.encode(), string_payload.encode(), hashlib.sha256).hexdigest()
+			
+			if hash_recibido != hash_calculado:
+				print("Error de Seguridad: El comando recibido no pasó la prueba de integridad (falsa firma o manipulación)", flush=True)
+				return None
+			
+			return paquete
 		
 		except asyncio.TimeoutError:
 			return None

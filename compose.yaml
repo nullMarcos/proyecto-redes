@@ -22,6 +22,9 @@ services:
       - type: bind
         source: "./torre/"
         target: "/service/"
+      - type: bind
+        source: "./servidor/certs/cert.pem"
+        target: "/service/cert.pem"
 
   servidor:
     build:

@@ -10,6 +10,8 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from sqlalchemy.orm import Session
 
+import hmac
+
 import sys
 from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
@@ -30,7 +32,6 @@ from operadores import Comando, SolicitudComando
 
 app = FastAPI(title="Servidor de Monitoreo - Torres Completas")
 
-# models.Base.metadata.create_all(bind=engine)
 
 @app.on_event("startup")
 def inicializar_base_de_datos():
@@ -283,7 +284,7 @@ async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[s
             hash_recibido = paquete.pop('hash_integridad', None)
             token = os.environ.get('TOKEN_SECRETO', '')
             string_payload = json.dumps(paquete, sort_keys=True)
-            hash_calculado = hashlib.sha256((string_payload + token).encode()).hexdigest()
+            hash_calculado = hmac.new(token.encode(), string_payload.encode(), hashlib.sha256).hexdigest()
             
             if hash_recibido != hash_calculado:
                 print(f"[ALERTA DE SEGURIDAD] Paquete de Torre {torre_id} rechazado por fallo de integridad.")
@@ -434,6 +435,12 @@ async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[s
 
             else:
                 respuesta_payload = {"instruccion": "N/A", "valor_parametro": None}
+
+            # Firmar el payload
+            token = os.environ.get('TOKEN_SECRETO', '')
+            string_payload_resp = json.dumps(respuesta_payload, sort_keys=True)
+            firma = hmac.new(token.encode(), string_payload_resp.encode(), hashlib.sha256).hexdigest()
+            respuesta_payload['hash_integridad'] = firma
 
             # Responder inmediatamente con la instrucción (ya sea N/A, del operador o automática)
             await websocket.send_text(json.dumps(respuesta_payload))
