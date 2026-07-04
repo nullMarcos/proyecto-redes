@@ -58,7 +58,7 @@ class Comando(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     id_torre: Mapped[int] = mapped_column(ForeignKey("torre_blanqueamiento.id"), nullable=False)
-    id_operador: Mapped[Optional[int]] = mapped_column(ForeignKey("operador.id"), nullable=True)
+    id_operador: Mapped[int] = mapped_column(ForeignKey("operador.id"), nullable=False)
     fecha_hora: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     tipo_instruccion: Mapped[str] = mapped_column(String(100))
     valor_parametro: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -67,7 +67,7 @@ class Comando(Base):
 
     # Relaciones
     torre: Mapped["TorreBlanqueamiento"] = relationship(back_populates="comandos")
-    operador: Mapped[Optional["Operador"]] = relationship(back_populates="comandos")
+    operador: Mapped["Operador"] = relationship(back_populates="comandos")
 
 
 class AlertaProceso(Base):

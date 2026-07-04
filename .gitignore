@@ -24,3 +24,12 @@ __pycache__/
 # GIT
 
 .gitcommit.txt
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Virtual Environments
+.venv/

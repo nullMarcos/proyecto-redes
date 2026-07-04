@@ -11,6 +11,7 @@ services:
 
     environment:
       - TORRE_ID=1
+      - API_KEY=mi_super_secreto_key_123
 
     depends_on:
       servidor:

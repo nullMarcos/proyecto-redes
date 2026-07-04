@@ -25,9 +25,8 @@ class SQLOperadorRepository(OperadorRepository):
         )
 
     def registrar_comando(self, comando: PydanticComando) -> PydanticComando:
-        # Manejo de la fricción del ID 0 (Automatizaciones del sistema central)
-        # Si el operador es 0, en la base de datos guardamos NULL (None) 
-        id_op_db = comando.id_operador if comando.id_operador != 0 else None
+        # El operador 0 representa al Sistema Central (acciones automáticas) y se almacena directamente
+        id_op_db = comando.id_operador
 
         db_comando = models.Comando(
             id_torre=comando.id_torre,

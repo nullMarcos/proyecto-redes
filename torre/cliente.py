@@ -103,10 +103,14 @@ async def main():
 	
 	try:
 		torre_ID = os.environ['TORRE_ID']
-		URL_servidor = f'{os.environ['SERVER_BASE_URL']}/torre/{torre_ID}'
+		api_key = os.environ.get('API_KEY', '')
+		URL_servidor = f"{os.environ['SERVER_BASE_URL']}/torre/{torre_ID}?api_key={api_key}"
 	
-	except:
-		print('Error: No fue posible construir la URL de comunicacion con el servidor', flush = True)
+	except KeyError:
+		print('Error: Faltan variables de entorno requeridas (TORRE_ID, SERVER_BASE_URL)', flush = True)
+		return
+	except Exception as e:
+		print(f'Error: No fue posible construir la URL de comunicación con el servidor: {e}', flush = True)
 		
 		return
 	

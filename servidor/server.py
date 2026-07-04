@@ -32,6 +32,53 @@ app = FastAPI(title="Servidor de Monitoreo - Torres Completas")
 
 # models.Base.metadata.create_all(bind=engine)
 
+@app.on_event("startup")
+def inicializar_base_de_datos():
+    """Inicializa la base de datos con datos de prueba (seeding) si está vacía."""
+    print("[INIT DB] Comprobando inicialización de datos de prueba...")
+    with SessionLocal() as db:
+        # Crear el operador de prueba (ID 123) si no existe
+        operador_existente = db.query(models.Operador).filter_by(id=123).first()
+        if not operador_existente:
+            nuevo_operador = models.Operador(
+                id=123,
+                nombre="Diego Rebollo",
+                email="diego.rebollo@salmoftware.com",
+                password_hash="pbkdf2:sha256:600000$mock$5e04cb667108b8d7f02b7b6fdf29a6f97f3beba38af537d15a56fb5687c7843a2d"
+            )
+            db.add(nuevo_operador)
+            print("[INIT DB] Operador por defecto creado (ID: 123).")
+        
+        # Crear el operador de sistema (ID 0) si no existe
+        operador_sistema = db.query(models.Operador).filter_by(id=0).first()
+        if not operador_sistema:
+            nuevo_operador_sistema = models.Operador(
+                id=0,
+                nombre="Sistema Central (Automático)",
+                email="sistema.central@salmoftware.com",
+                password_hash="pbkdf2:sha256:600000$system$default_password_hash"
+            )
+            db.add(nuevo_operador_sistema)
+            print("[INIT DB] Operador Sistema Central creado (ID: 0).")
+        
+        # Crear la torre por defecto (ID 1) si no existe
+        torre_existente = db.query(models.TorreBlanqueamiento).filter_by(id=1).first()
+        if not torre_existente:
+            # Clave de desarrollo: "mi_super_secreto_key_123"
+            dev_key = "mi_super_secreto_key_123"
+            dev_key_hash = hashlib.sha256(dev_key.encode()).hexdigest()
+            
+            nueva_torre = models.TorreBlanqueamiento(
+                id=1,
+                sector="Sector Norte - Desarrollo",
+                estado="OFFLINE",
+                api_key_hash=dev_key_hash
+            )
+            db.add(nueva_torre)
+            print("[INIT DB] Torre por defecto creada (ID: 1, API Key: 'mi_super_secreto_key_123').")
+        
+        db.commit()
+
 class ConnectionManager:
     """
     Clase para manejar y agrupar las conexiones activas del servidor.
@@ -154,7 +201,7 @@ async def inicio():
 
 
 @app.websocket("/ws/torre/{torre_id}")
-async def manejar_torre(websocket: WebSocket, torre_id: str):
+async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[str] = None):
     """
     Maneja la conexión en tiempo real con un nodo (Torre completa).
 
@@ -162,22 +209,69 @@ async def manejar_torre(websocket: WebSocket, torre_id: str):
     :type websocket: WebSocket
     :param torre_id: Identificador único de la torre.
     :type torre_id: str
+    :param api_key: Clave API opcional para autenticación del nodo.
+    :type api_key: Optional[str]
     """
     try:
         torre_int = int(torre_id)
     except ValueError:
         torre_int = None
 
+    # Si el ID es inválido, rechazar conexión
+    if torre_int is None:
+        await websocket.accept()
+        await websocket.close(code=1008)
+        print(f"[CONEXIÓN RECHAZADA] ID de torre inválido: '{torre_id}'")
+        return
+
+    # Validar presencia de la API Key
+    if not api_key:
+        await websocket.accept()
+        await websocket.close(code=1008)
+        print(f"[CONEXIÓN RECHAZADA] Torre {torre_id} intentó conectar sin API Key.")
+        return
+
+    # Autenticar la API Key contra la base de datos
+    authenticated = False
+    with SessionLocal() as db:
+        torre_repo = SQLTorreRepository(db)
+        alerta_repo = SQLAlertaRepository(db)
+        torre = torre_repo.obtener_por_id(torre_int)
+        
+        if not torre:
+            print(f"[CONEXIÓN RECHAZADA] La torre {torre_id} no está registrada en la base de datos.")
+        else:
+            import hmac
+            key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+            if hmac.compare_digest(key_hash, torre.api_key_hash):
+                authenticated = True
+            else:
+                print(f"[ALERTA DE SEGURIDAD] Intento de conexión con API Key inválida para torre {torre_id}.")
+                try:
+                    alerta_repo.registrar_alerta_seguridad(
+                        id_torre=torre_int,
+                        tipo_evento="CONEXION_API_KEY_INVALIDA",
+                        origen_ip=websocket.client.host if websocket.client else None,
+                        payload=f"API Key incorrecta provista: {api_key[:3]}..." if api_key else ""
+                    )
+                except Exception as e:
+                    print(f"[ERROR REGISTRO ALERTA SEGURIDAD] {e}")
+
+    if not authenticated:
+        await websocket.accept()
+        await websocket.close(code=1008)
+        return
+
+    # Si está autenticado, procedemos a conectar y registrar
     await manager.connect(websocket, torre_id)
 
-    if torre_int is not None:
-        # Registrar estado de conexión ONLINE en base de datos
-        with SessionLocal() as db:
-            torre_repo = SQLTorreRepository(db)
-            try:
-                torre_repo.actualizar_estado(torre_int, "ONLINE")
-            except Exception as e:
-                print(f"[ERROR ESTADO TORRE] No se pudo cambiar a ONLINE: {e}")
+    # Registrar estado de conexión ONLINE en base de datos
+    with SessionLocal() as db:
+        torre_repo = SQLTorreRepository(db)
+        try:
+            torre_repo.actualizar_estado(torre_int, "ONLINE")
+        except Exception as e:
+            print(f"[ERROR ESTADO TORRE] No se pudo cambiar a ONLINE: {e}")
 
     try:
         while True:
