@@ -24,16 +24,20 @@ services:
 
   servidor:
     build:
-      context: "./servidor/"
-      dockerfile: "./dockerfile"
+      context: "."
+      dockerfile: "./servidor/dockerfile"
 
     image: "servidor"
     container_name: "servidor"
+
+    environment:
+      - DATABASE_URL=sqlite:////data/monitoreo_industrial.db
 
     ports:
       - 5050:5050
 
     volumes:
-      - type: bind
-        source: "./servidor/"
-        target: "/service/"
+      - ./servidor:/app/servidor
+      - ./database:/app/database
+      - ./alembic.ini:/app/alembic.ini
+      - ./data:/data

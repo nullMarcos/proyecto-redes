@@ -16,10 +16,12 @@ FROM ubuntu:24.04
 	# Establecer el directorio de trabajo dentro del contenedor
 	WORKDIR /app
 	
-	# Copiar los archivos de la carpeta del servidor al contenedor
-	COPY . /app/server
+	# Copiar las carpetas necesarias al contenedor
+	COPY ./database /app/database
+	COPY ./servidor /app/servidor
+	COPY ./alembic.ini /app/alembic.ini
 	
-	#  Instalar las librerías de Python requeridas para el servidor
-	RUN pip3 install --break-system-packages fastapi uvicorn websockets
+	# Instalar las librerías de Python requeridas para el servidor 
+	RUN pip3 install --break-system-packages fastapi uvicorn websockets sqlalchemy alembic
 	EXPOSE 5050
-	CMD ["python3", "server/server.py"]
+	CMD ["sh", "-c", "alembic upgrade head && python3 servidor/server.py"]
