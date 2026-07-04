@@ -2,12 +2,15 @@
 
 from typing import Optional
 from types import SimpleNamespace
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import json
 import os
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import jwt
+from werkzeug.security import check_password_hash
 from sqlalchemy.orm import Session
 
 import hmac
@@ -31,6 +34,54 @@ from database.repositories import (
 from operadores import Comando, SolicitudComando
 
 app = FastAPI(title="Servidor de Monitoreo - Torres Completas")
+
+# Configuración JWT
+SECRET_KEY = os.environ.get("JWT_SECRET", "super_secreto_jwt_para_desarrollo")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def get_current_operador(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Credenciales inválidas",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except jwt.PyJWTError:
+        raise credentials_exception
+        
+    repo = SQLOperadorRepository(db)
+    operador = repo.obtener_por_email(email=email)
+    if operador is None:
+        raise credentials_exception
+    return operador
+
+@app.post("/api/login")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    repo = SQLOperadorRepository(db)
+    operador = repo.obtener_por_email(form_data.username)
+    if not operador or not check_password_hash(operador.password_hash, form_data.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email o contraseña incorrectos",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token = create_access_token(data={"sub": operador.email})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.on_event("startup")
@@ -142,7 +193,11 @@ manager = ConnectionManager()  # Se instancia la clase para manejar conexiones
 
 # Endpoint HTTP: Para que el Operador envíe comandos
 @app.post("/api/control/comando")
-async def send_operator_command(solicitud: SolicitudComando, db: Session = Depends(get_db)):
+async def send_operator_command(
+    solicitud: SolicitudComando, 
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_operador)
+):
     """
     Endpoint para que un operador envíe un comando a una torre específica.
     param solicitud: Objeto que contiene los detalles del comando a enviar.
@@ -152,10 +207,10 @@ async def send_operator_command(solicitud: SolicitudComando, db: Session = Depen
     """
 
     repo = SQLOperadorRepository(db)
-    # 1. Validar operador
-    operador = repo.obtener_por_id(solicitud.id_operador)
-    if not operador:
-        raise HTTPException(status_code=404, detail="Operador no registrado.")
+    
+    # 1. Validar operador (Ya autenticado por JWT)
+    # Sobrescribimos el ID del operador en la solicitud con el del usuario real logueado
+    solicitud.id_operador = current_user.id
 
     # 2. Validar que la torre esté activa
     if str(solicitud.id_torre) not in manager.active_connections:

@@ -24,6 +24,22 @@ class SQLOperadorRepository(OperadorRepository):
             password_hash=db_operador.password_hash
         )
 
+    def obtener_por_email(self, email: str) -> Optional[PydanticOperador]:
+        db_operador = self.db.query(models.Operador).filter(
+            models.Operador.email == email
+        ).first()
+        
+        if not db_operador:
+            return None
+            
+        return PydanticOperador(
+            id=db_operador.id,
+            nombre=db_operador.nombre,
+            email=db_operador.email,
+            password_hash=db_operador.password_hash
+        )
+
+
     def registrar_comando(self, comando: PydanticComando) -> PydanticComando:
         # El operador 0 representa al Sistema Central (acciones automáticas) y se almacena directamente
         id_op_db = comando.id_operador
