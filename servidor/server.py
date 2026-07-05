@@ -404,6 +404,21 @@ async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[s
                             desc=f"Caudal alto ({caudal} L/s) pero presión baja ({presion} kPa)."
                         )
 
+                        # Control Automático: Cierre de válvulas ante posible fuga para evitar derrames
+                        hash_val_fuga = hashlib.sha256(f"0-{torre_int}-AUTO-FUGA-{datetime.now().isoformat()}".encode()).hexdigest()
+                        cmd_fuga1 = Comando(
+                            id_torre=torre_int, id_operador=0, fecha_hora=datetime.now(),
+                            tipo_instruccion="DISMINUIR_FLUJO_PULPA", valor_parametro=100.0,
+                            estado_ejecucion="pendiente", hash_comando=hash_val_fuga
+                        )
+                        cmd_fuga2 = Comando(
+                            id_torre=torre_int, id_operador=0, fecha_hora=datetime.now(),
+                            tipo_instruccion="DISMINUIR_FLUJO_CLO2", valor_parametro=50.0,
+                            estado_ejecucion="pendiente", hash_comando=hash_val_fuga
+                        )
+                        manager.add_instruction(torre_int, repo.registrar_comando(cmd_fuga1))
+                        manager.add_instruction(torre_int, repo.registrar_comando(cmd_fuga2))
+
                     # Alerta por desviación de neutralización química (pH fuera de rango crítico)
                     if ph < 2.5 or ph > 8.5:
                         print(
@@ -415,6 +430,24 @@ async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[s
                             tipo="ANOMALIA_QUIMICA",
                             desc=f"pH fuera de rango crítico: {ph}"
                         )
+
+                        # Control Automático: Mitigación para estabilizar pH
+                        hash_val_ph = hashlib.sha256(f"0-{torre_int}-AUTO-PH-{datetime.now().isoformat()}".encode()).hexdigest()
+                        if ph < 2.5:
+                            # Diluir acidez aumentando flujo de pulpa
+                            cmd_ph = Comando(
+                                id_torre=torre_int, id_operador=0, fecha_hora=datetime.now(),
+                                tipo_instruccion="AUMENTAR_FLUJO_PULPA", valor_parametro=5.0,
+                                estado_ejecucion="pendiente", hash_comando=hash_val_ph
+                            )
+                        else:
+                            # Acidificar la mezcla aumentando flujo de CLO2
+                            cmd_ph = Comando(
+                                id_torre=torre_int, id_operador=0, fecha_hora=datetime.now(),
+                                tipo_instruccion="AUMENTAR_FLUJO_CLO2", valor_parametro=2.0,
+                                estado_ejecucion="pendiente", hash_comando=hash_val_ph
+                            )
+                        manager.add_instruction(torre_int, repo.registrar_comando(cmd_ph))
 
                     # Alerta por desviación térmica severa
                     if temperatura > 95.0:
@@ -428,11 +461,27 @@ async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[s
                             desc=f"Temperatura fuera de rango crítico: {temperatura}"
                         )
 
+                        # Control Automático: Mitigación por temperatura excesiva
+                        hash_val_temp = hashlib.sha256(f"0-{torre_int}-AUTO-TEMP-{datetime.now().isoformat()}".encode()).hexdigest()
+                        cmd_temp = Comando(
+                            id_torre=torre_int, id_operador=0, fecha_hora=datetime.now(),
+                            tipo_instruccion="DISMINUIR_TEMPERATURA", valor_parametro=10.0,
+                            estado_ejecucion="pendiente", hash_comando=hash_val_temp
+                        )
+                        manager.add_instruction(torre_int, repo.registrar_comando(cmd_temp))
+
                     # Control Automatizado: Mitigación inmediata por sobrepresión física
                     if presion > 150.0:
                         print(
                             f"[CONTROL AUTOMÁTICO - TORRE {torre_id}] ¡Presión crítica! ({presion} kPa). "
                             f"Gatillando apertura de válvula de alivio de emergencia."
+                        )
+
+                        # Registrar formalmente la Alerta de Proceso en la BD antes de mitigar
+                        alerta_repo.registrar_alerta_proceso(
+                            id_torre=torre_int,
+                            tipo="SOBREPRESION_CRITICA",
+                            desc=f"Presión superó los 150 kPa ({presion} kPa). Se ha gatillado la válvula de alivio."
                         )
 
                         # Generamos el comando de mitigación de manera automática

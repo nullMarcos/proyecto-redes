@@ -60,6 +60,8 @@ class SolicitudComando(BaseModel):
 			TipoInstruccion.DISMINUIR_TEMPERATURA,
 			TipoInstruccion.AUMENTAR_FLUJO_PULPA,
 			TipoInstruccion.DISMINUIR_FLUJO_PULPA,
+			TipoInstruccion.AUMENTAR_FLUJO_CLO2,
+			TipoInstruccion.DISMINUIR_FLUJO_CLO2,
 		}
 		
 		if (
