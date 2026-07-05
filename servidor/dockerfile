@@ -22,6 +22,6 @@ FROM ubuntu:24.04
 	COPY ./alembic.ini /app/alembic.ini
 	
 	# Instalar las librerías de Python requeridas para el servidor 
-	RUN pip3 install --break-system-packages fastapi uvicorn websockets sqlalchemy alembic pyjwt Werkzeug
+	RUN pip3 install --break-system-packages fastapi uvicorn websockets sqlalchemy alembic pyjwt Werkzeug python-multipart
 	EXPOSE 5050
 	CMD ["sh", "-c", "alembic upgrade head && python3 servidor/server.py"]
