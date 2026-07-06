@@ -5,43 +5,60 @@ services:
     build:
       context: "./torre/"
       dockerfile: "./dockerfile"
-
+    
     image: "torre"
     container_name: "torre"
-
+    
     environment:
       - TORRE_ID=1
-      - API_KEY=mi_super_secreto_key_123
-
+    
     depends_on:
       servidor:
         condition: service_healthy
         restart: true
-
+    
     volumes:
       - type: bind
         source: "./torre/"
         target: "/service/"
+      
       - type: bind
         source: "./servidor/certs/cert.pem"
         target: "/service/cert.pem"
-
+    
+    secrets:
+      - API-KEY
+      - TOKEN-TORRE
+  
   servidor:
     build:
-      context: "."
-      dockerfile: "./servidor/dockerfile"
-
+      context: "./servidor/"
+      dockerfile: "./dockerfile"
+    
     image: "servidor"
     container_name: "servidor"
-
+    
     environment:
       - DATABASE_URL=sqlite:////data/monitoreo_industrial.db
-
+    
     ports:
       - 5050:5050
-
+    
     volumes:
       - ./servidor:/app/servidor
       - ./database:/app/database
       - ./alembic.ini:/app/alembic.ini
       - ./data:/data
+    
+    secrets:
+      - TOKEN-SERVIDOR
+
+secrets:
+  API-KEY:
+    file: "./torre/secrets/API-KEY"
+  
+  TOKEN-TORRE:
+    file: "./torre/secrets/TOKEN-TORRE"
+  
+  TOKEN-SERVIDOR:
+    file: "./servidor/secrets/TOKEN-SERVIDOR"

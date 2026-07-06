@@ -337,7 +337,10 @@ async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[s
 
             # === AUDITORÍA DE INTEGRIDAD ===
             hash_recibido = paquete.pop('hash_integridad', None)
-            token = os.environ.get('TOKEN_SECRETO', '')
+            
+            with open('/run/secrets/TOKEN-SERVIDOR') as file:
+                token = file.read()
+            
             string_payload = json.dumps(paquete, sort_keys=True)
             hash_calculado = hmac.new(token.encode(), string_payload.encode(), hashlib.sha256).hexdigest()
             
@@ -541,7 +544,10 @@ async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[s
                 respuesta_payload = {"instruccion": "N/A", "valor_parametro": None}
 
             # Firmar el payload
-            token = os.environ.get('TOKEN_SECRETO', '')
+            
+            with open('/run/secrets/TOKEN-SERVIDOR') as file:
+                token = file.read()
+            
             string_payload_resp = json.dumps(respuesta_payload, sort_keys=True)
             firma = hmac.new(token.encode(), string_payload_resp.encode(), hashlib.sha256).hexdigest()
             respuesta_payload['hash_integridad'] = firma

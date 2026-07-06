@@ -1,6 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
-from servidor.operadores import OperadorRepository, Operador as PydanticOperador, Comando as PydanticComando
+from operadores import OperadorRepository, Operador as PydanticOperador, Comando as PydanticComando
 from . import models
 
 class SQLOperadorRepository(OperadorRepository):

@@ -9,20 +9,15 @@ import hmac
 
 from Torre import Torre
 
-'''
-TODO:
-- Revisar pertinencia de SSL:
-	* https://docs.python.org/3/library/ssl.html#module-ssl
-	* https://docs.python.org/3/library/ssl.html#ssl-security
-
-- Crear clase para manejar conexion con el servidor. Así como está ahora hay muchas cosas que pueden salir mal.
-- Probablemente sería mejor que el envío de datos y la recepción de instrucciones operen en hilos diferentes.
-'''
-
 class Servidor:
 	def __init__(self, URL):
 		self.URL = URL
 		self.conexion = None
+		
+		self.token = None
+		
+		with open('/run/secrets/TOKEN-TORRE', 'r') as file:
+			self.token = file.read()
 		
 		return
 	
@@ -60,19 +55,19 @@ class Servidor:
 		return
 	
 	'''
-	@param datos Un diccionario con informacion
+	@param datos: Un diccionario con informacion
 	'''
 	async def enviar(self, datos):
 		await self.conectar()
 		
 		try:
-			token = os.environ.get('TOKEN_SECRETO', '')
 			payload_para_firmar = dict(datos)
+			
 			if 'hash_integridad' in payload_para_firmar:
 				del payload_para_firmar['hash_integridad']
 				
 			string_payload = json.dumps(payload_para_firmar, sort_keys=True)
-			firma = hmac.new(token.encode(), string_payload.encode(), hashlib.sha256).hexdigest()
+			firma = hmac.new(self.token.encode(), string_payload.encode(), hashlib.sha256).hexdigest()
 			
 			datos['hash_integridad'] = firma
 			
@@ -95,10 +90,9 @@ class Servidor:
 			respuesta = await asyncio.wait_for(self.conexion.recv(), timeout = 1.0)
 			paquete = json.loads(respuesta)
 			
-			token = os.environ.get('TOKEN_SECRETO', '')
 			hash_recibido = paquete.pop('hash_integridad', None)
 			string_payload = json.dumps(paquete, sort_keys=True)
-			hash_calculado = hmac.new(token.encode(), string_payload.encode(), hashlib.sha256).hexdigest()
+			hash_calculado = hmac.new(self.token.encode(), string_payload.encode(), hashlib.sha256).hexdigest()
 			
 			if hash_recibido != hash_calculado:
 				print("Error de Seguridad: El comando recibido no pasó la prueba de integridad (falsa firma o manipulación)", flush=True)
@@ -116,7 +110,12 @@ async def main():
 	
 	try:
 		torre_ID = os.environ['TORRE_ID']
-		api_key = os.environ.get('API_KEY', '')
+		
+		api_key = None
+		
+		with open('/run/secrets/API-KEY') as file:
+			api_key = file.read()
+		
 		URL_servidor = f"{os.environ['SERVER_BASE_URL']}/torre/{torre_ID}?api_key={api_key}"
 	
 	except KeyError:

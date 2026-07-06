@@ -1,0 +1,8 @@
+alembic
+fastapi
+pyjwt
+python-multipart
+sqlalchemy
+uvicorn
+websockets
+Werkzeug
