@@ -18,13 +18,10 @@ services:
         restart: true
     
     volumes:
-      - type: bind
-        source: "./torre/"
-        target: "/service/"
-      
-      - type: bind
-        source: "./servidor/certs/cert.pem"
+      - source: "./servidor/certs/cert.pem"
         target: "/service/cert.pem"
+        
+        type: "bind"
     
     secrets:
       - API-KEY
@@ -45,10 +42,10 @@ services:
       - 5050:5050
     
     volumes:
-      - ./servidor:/app/servidor
-      - ./database:/app/database
-      - ./alembic.ini:/app/alembic.ini
-      - ./data:/data
+      - source: "./servidor/data/"
+        target: "/data/"
+        
+        type: "bind"
     
     secrets:
       - TOKEN-SERVIDOR
