@@ -346,6 +346,9 @@ async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[s
             
             if hash_recibido != hash_calculado:
                 print(f"[ALERTA DE SEGURIDAD] Paquete de Torre {torre_id} rechazado por fallo de integridad.")
+                print(f"DEBUG HMAC - Recibido: {hash_recibido}")
+                print(f"DEBUG HMAC - Calculado: {hash_calculado}")
+                print(f"DEBUG HMAC - String: {repr(string_payload)}")
                 # Registrar alerta de seguridad en BD
                 if torre_int is not None:
                     with SessionLocal() as db:
