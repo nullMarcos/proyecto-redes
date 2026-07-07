@@ -17,7 +17,7 @@ class Servidor:
 		self.token = None
 		
 		with open('/run/secrets/TOKEN-TORRE', 'r') as file:
-			self.token = file.read()
+			self.token = file.read().strip()
 		
 		return
 	

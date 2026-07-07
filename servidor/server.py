@@ -339,7 +339,7 @@ async def manejar_torre(websocket: WebSocket, torre_id: str, api_key: Optional[s
             hash_recibido = paquete.pop('hash_integridad', None)
             
             with open('/run/secrets/TOKEN-SERVIDOR') as file:
-                token = file.read()
+                token = file.read().strip()
             
             string_payload = json.dumps(paquete, sort_keys=True)
             hash_calculado = hmac.new(token.encode(), string_payload.encode(), hashlib.sha256).hexdigest()
