@@ -72,7 +72,7 @@ class Servidor:
 			datos['hash_integridad'] = firma
 			
 			print(f'Enviando información:', flush = True)
-			print(json.dumps(datos, indent = 2), flush = True)
+			print(json.dumps(datos, indent = 2, ensure_ascii = False), flush = True)
 			
 			await self.conexion.send(json.dumps(datos))
 		
