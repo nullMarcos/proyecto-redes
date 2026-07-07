@@ -42,7 +42,7 @@ services:
       - 5050:5050
     
     volumes:
-      - source: "./servidor/data/"
+      - source: "./data/"
         target: "/data/"
         
         type: "bind"
